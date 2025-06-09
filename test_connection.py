@@ -1,16 +1,16 @@
 """
-Скрипт для перевірки підключення до PostgreSQL та тестування основних операцій
+Скрипт для тестування підключення до PostgreSQL
 """
 
-import pandas as pd
 import psycopg2
+import pandas as pd
 from sqlalchemy import create_engine
 import logging
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-def test_postgres_connection():
+def test_postgresql_connection():
     """Тестування підключення до PostgreSQL"""
     
     conn_params = {
@@ -31,7 +31,8 @@ def test_postgres_connection():
         logger.info(f"PostgreSQL версія: {version}")
         
         cursor.close()
-        conn.close()        logger.info("[УСПІХ] Базове підключення успішне!")
+        conn.close()
+        logger.info("[УСПІХ] Базове підключення успішне!")
         
         logger.info("Тестування підключення через SQLAlchemy...")
         engine = create_engine(
@@ -42,78 +43,78 @@ def test_postgres_connection():
             result = connection.execute("SELECT 1 as test_column;")
             test_value = result.fetchone()[0]
             logger.info(f"Тестовий запит повернув: {test_value}")
-          logger.info("[УСПІХ] SQLAlchemy підключення успішне!")
         
-        logger.info("Тестування завантаження CSV файлу...")
-        csv_path = r'c:\Users\bardi\Downloads\airflow_6\starbucks.csv'
-        df = pd.read_csv(csv_path)
+        logger.info("[УСПІХ] SQLAlchemy підключення успішне!")
         
-        logger.info(f"Завантажено {len(df)} рядків з CSV")
-        logger.info(f"Колонки: {list(df.columns)}")
-        logger.info(f"Перші 3 рядки:\n{df.head(3)}")
+        logger.info("Тестування завантаження тестових даних...")
+        test_data = pd.DataFrame({
+            'test_column': [1, 2, 3],
+            'test_value': ['a', 'b', 'c']
+        })
         
-        logger.info("Тестування збереження даних в PostgreSQL...")
-        df.head(10).to_sql('test_starbucks', engine, if_exists='replace', index=False)
+        test_data.to_sql('connection_test', engine, if_exists='replace', index=False)
         
-        with engine.connect() as connection:
-            result = connection.execute("SELECT COUNT(*) FROM test_starbucks;")
-            count = result.fetchone()[0]
-            logger.info(f"Збережено {count} тестових записів")
-        
-        with engine.connect() as connection:
-            connection.execute("DROP TABLE IF EXISTS test_starbucks;")
-          logger.info("[УСПІХ] Тест завантаження в PostgreSQL успішний!")
+        result_df = pd.read_sql('SELECT * FROM connection_test', engine)
+        logger.info(f"Завантажено {len(result_df)} рядків")
+        logger.info("[УСПІХ] Тест завантаження в PostgreSQL успішний!")
         
         return True
         
     except Exception as e:
-        logger.error(f"[ПОМИЛКА] Помилка при тестуванні: {str(e)}")
+        logger.error(f"[ПОМИЛКА] Не вдалося підключитися до PostgreSQL: {str(e)}")
         return False
 
-def check_airflow_tables():
-    """Перевірка наявності таблиць Airflow"""
-    
-    conn_params = {
-        'host': 'localhost',
-        'port': '5432',
-        'database': 'airflow',
-        'user': 'airflow',
-        'password': 'airflow'
-    }
-    
+def test_airflow_metadata():
+    """Тестування доступу до метаданих Airflow"""
     try:
-        engine = create_engine(
-            f"postgresql+psycopg2://{conn_params['user']}:{conn_params['password']}@{conn_params['host']}:{conn_params['port']}/{conn_params['database']}"
-        )
+        logger.info("Перевірка таблиць Airflow...")
+        engine = create_engine("postgresql+psycopg2://airflow:airflow@localhost:5432/airflow")
         
         with engine.connect() as connection:
-            result = connection.execute("""
-                SELECT table_name 
-                FROM information_schema.tables 
-                WHERE table_schema = 'public' 
-                AND table_name LIKE '%dag%' OR table_name LIKE '%task%'
-                ORDER BY table_name;
-            """)
+            tables_query = """
+            SELECT table_name 
+            FROM information_schema.tables 
+            WHERE table_schema = 'public' 
+            AND table_type = 'BASE TABLE'
+            ORDER BY table_name;
+            """
             
+            result = connection.execute(tables_query)
             tables = [row[0] for row in result.fetchall()]
-              if tables:
-                logger.info("[ЗНАЙДЕНО] Знайдені таблиці Airflow:")
-                for table in tables:
-                    logger.info(f"  - {table}")
-            else:
-                logger.warning("[УВАГА] Таблиці Airflow не знайдені. Можливо потрібно запустити 'airflow db init'")
-                  except Exception as e:
-        logger.error(f"[ПОМИЛКА] Помилка при перевірці таблиць Airflow: {str(e)}")
+            
+            logger.info(f"Знайдено {len(tables)} таблиць в базі даних")
+            
+            if 'dag_run' in tables:
+                dag_runs_query = "SELECT COUNT(*) FROM dag_run;"
+                result = connection.execute(dag_runs_query)
+                dag_count = result.fetchone()[0]
+                logger.info(f"Знайдено {dag_count} запусків DAG")
+            
+            logger.info("[УСПІХ] Доступ до метаданих Airflow успішний!")
+            
+        return True
+        
+    except Exception as e:
+        logger.error(f"[ПОМИЛКА] Не вдалося перевірити метадані Airflow: {str(e)}")
+        return False
 
 if __name__ == "__main__":
-    logger.info("Початок тестування підключення PostgreSQL...")
+    logger.info("🚀 Початок тестування підключення...")
     
-    if test_postgres_connection():
-        logger.info("\n" + "="*50)
-        logger.info("Перевірка таблиць Airflow...")
-        check_airflow_tables()
-          logger.info("\n" + "="*50)
-        logger.info("[УСПІХ] Всі тести пройдені успішно!")
-        logger.info("Тепер ви можете запускати Airflow DAGs")
+    success_count = 0
+    total_tests = 2
+    
+    if test_postgresql_connection():
+        success_count += 1
+    
+    if test_airflow_metadata():
+        success_count += 1
+    
+    logger.info("="*50)
+    logger.info(f"📊 ПІДСУМОК ТЕСТУВАННЯ:")
+    logger.info(f"   Успішних тестів: {success_count}/{total_tests}")
+    
+    if success_count == total_tests:
+        logger.info("🎉 Всі тести пройдено успішно!")
     else:
-        logger.error("[ПОМИЛКА] Є проблеми з підключенням. Перевірте налаштування PostgreSQL")
+        logger.info("⚠️  Деякі тести не пройдено")

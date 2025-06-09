@@ -23,8 +23,3 @@
    - Увімкніть DAG `starbucks_elt_pipeline`
    - Натисніть кнопку "▶️ Trigger DAG"
 
-## Що далі?
-
-- [PROJECT_DOCUMENTATION.md](PROJECT_DOCUMENTATION.md) - Повна документація проєкту
-- [TECHNICAL_DOCUMENTATION.md](TECHNICAL_DOCUMENTATION.md) - Технічні деталі
-- [USER_GUIDE.md](USER_GUIDE.md) - Детальне керівництво користувача
