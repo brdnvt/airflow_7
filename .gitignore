@@ -1,0 +1,23 @@
+# Airflow logs
+logs/
+*.log
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Environment variables
+.env.local
+.env.production
+
+# Docker volumes
+volumes/
+
+# IDE files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
